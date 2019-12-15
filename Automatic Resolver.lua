@@ -12,11 +12,11 @@
 --- Gui Stuff
 local pos = gui.Reference("RAGE", "MAIN", "Extra")
 local enabled = gui.Checkbox(pos, "rbot_autoresolver", "Automatic Resolver", 0)
-local listEnabled = gui.Checkbox(pos, "rbot_autoresolver_list", "Desyncing Player List", 0)
+local warningEnabled = gui.Checkbox(pos, "rbot_autoresolver_warning", "Desync Warning", 0)
+local listEnabled = gui.Checkbox(pos, "rbot_autoresolver_list", "Desync List", 0)
 
 --- Tables.
 local isDesyncing = {};
-local isLegit = {};
 local lastSimtime = {};
 local desyncCooldown = {};
 
@@ -40,49 +40,50 @@ local function drawHook()
 
     if enabled:GetValue() then
         resolverTextCount = 0;
-            for pEntityIndex, pEntity in pairs(entities.FindByClass("CCSPlayer")) do
-                if pEntity:GetTeamNumber() ~= pLocal:GetTeamNumber() then
-                    if globals.TickCount() > lastTick then
-                        if lastSimtime[pEntityIndex] ~= nil then
-                            if pEntity:GetProp("m_flSimulationTime") == lastSimtime[pEntityIndex] then
-                                isDesyncing[pEntityIndex] = true;
-                                isLegit[pEntityIndex] = false
-                                desyncCooldown[pEntityIndex] = globals.TickCount();
-                            else
-                                if desyncCooldown[pEntityIndex] ~= nil then
-                                    if desyncCooldown[pEntityIndex] < globals.TickCount() - 128 then
-                                        isDesyncing[pEntityIndex] = false;
-                                        isLegit[pEntityIndex] = true
-                                    end
-                                else
+        for pEntityIndex, pEntity in pairs(entities.FindByClass("CCSPlayer")) do
+            if pEntity:GetTeamNumber() ~= pLocal:GetTeamNumber() and pEntity:IsPlayer() and pEntity:IsAlive() then
+                if globals.TickCount() > lastTick then
+                    if lastSimtime[pEntityIndex] ~= nil then
+                        if pEntity:GetProp("m_flSimulationTime") == lastSimtime[pEntityIndex] then
+                            isDesyncing[pEntityIndex] = true;
+                            desyncCooldown[pEntityIndex] = globals.TickCount();
+                        else
+                            if desyncCooldown[pEntityIndex] ~= nil then
+                                if desyncCooldown[pEntityIndex] < globals.TickCount() - 128 then
                                     isDesyncing[pEntityIndex] = false;
-                                    isLegit[pEntityIndex] = true
                                 end
+                            else
+                                isDesyncing[pEntityIndex] = false;
                             end
                         end
-                        lastSimtime[pEntityIndex] = pEntity:GetProp("m_flSimulationTime")
                     end
+                    lastSimtime[pEntityIndex] = pEntity:GetProp("m_flSimulationTime")
+                end
 
-                if listEnabled:GetValue() then
-                    if engine.GetMapName() ~= "" then
-                        resolverTextCount = resolverTextCount+1
-                        if isDesyncing[pEntityIndex] then
-                            local pos = 407 + (sampleTextHeight/2 * resolverTextCount)
+                if engine.GetMapName() ~= "" then
+                    if isDesyncing[pEntityIndex] then
+                        local pos = 410 + (sampleTextHeight * resolverTextCount)
+                        if listEnabled:GetValue() then
                             draw.Text(2, pos, pEntity:GetName())
-                            resolverTextCount = resolverTextCount+1
                         end
+                        resolverTextCount = resolverTextCount+1
                     end
                 end
             end
         end
         lastTick = globals.TickCount();
+        if resolverTextCount ~= 0 then
+            gui.SetValue("rbot_resolver", 1);
+        else
+            gui.SetValue("rbot_resolver", 0);
+        end
     end
 end
 
 local function aimbotTargetHook(pEntity)
     if enabled:GetValue() then
 
-        if isLegit[pEntity:GetIndex()] == true then
+        if not isDesyncing[pEntity:GetIndex()] then
             gui.SetValue("rbot_resolver", 0);
         else
             gui.SetValue("rbot_resolver", 1);
@@ -90,6 +91,25 @@ local function aimbotTargetHook(pEntity)
     end
 end
 
+local function drawEspHook(builder)
+
+    if warningEnabled:GetValue() then
+        local pEntity = builder:GetEntity()
+
+        if pEntity:IsPlayer() and pEntity:IsAlive() and pEntity:GetTeamNumber() ~= pLocal:GetTeamNumber() then
+
+            if isDesyncing[pEntity:GetIndex()] then
+                builder:Color(255, 25, 25, 255)
+                builder:AddTextBottom("Desync")
+            else
+                builder:Color(255, 255, 25, 255)
+                builder:AddTextBottom("No Desync")
+            end
+        end
+    end
+end
+
 --- Callbacks
 callbacks.Register("Draw", drawHook)
 callbacks.Register("AimbotTarget", aimbotTargetHook)
+callbacks.Register("DrawESP", drawEspHook)
