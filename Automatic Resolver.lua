@@ -7,6 +7,7 @@
     If a player chokes packets the Simtime won't update, if we check if the simtime is equal to the last ticks simtime then the entity is choking packets.
     We will use this information to enable/disable the resolver.
 
+    Thanks to corrada for finding critical bug.
 --]===]
 
 --- Gui Stuff
@@ -62,8 +63,8 @@ local function drawHook()
 
                 if engine.GetMapName() ~= "" then
                     if isDesyncing[pEntityIndex] then
-                        local pos = 410 + (sampleTextHeight * resolverTextCount)
                         if listEnabled:GetValue() then
+                            local pos = 410 + (sampleTextHeight * resolverTextCount)
                             draw.Text(2, pos, pEntity:GetName())
                         end
                         resolverTextCount = resolverTextCount+1
